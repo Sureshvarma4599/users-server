@@ -64,4 +64,57 @@ const assignRole = async(req,res)=>{
     }
 }
 
-module.exports = { createUser, getUsers,assignRole };
+const getSwapMapping = async(req,res)=>{
+    try{
+        const rolesToUser = await User.aggregate([
+            { $unwind: "$roles" },
+            {
+                $group: {
+                    _id: "$roles",
+                    users: { $push: "$userName" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    role: "$_id",
+                    users: 1
+                }
+            }
+        ]);
+        
+        const roleToUser = await User.aggregate([
+            { $unwind: "$roles" },
+            {
+                $group: {
+                    _id: "$userName",
+                    roles: { $push: "$roles" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    userName: "$_id",
+                    roles: 1
+                }
+            }
+        ]);
+        
+        const finalResponse = {
+            roleToUsers: rolesToUser, 
+            userToRoles: roleToUser 
+        };
+        
+        finalResponse.roleToUsers = finalResponse.roleToUsers.map(({ role, users }) => ({ role, users }));
+        finalResponse.userToRoles = finalResponse.userToRoles.map(({ userName, roles }) => ({ user: userName, roles }));
+        
+
+      return res.status(200).json({data:finalResponse});
+
+    }catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: 'Failed to assign role to users' });
+    }
+}
+
+module.exports = { createUser, getUsers,assignRole, getSwapMapping };
